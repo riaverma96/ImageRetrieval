@@ -48,7 +48,6 @@ class BaseModel(nn.Module):
     def __init__(self, a_net, v_net, classifier):
         super(BaseModel, self).__init__()
 
-        self.vmodel = vgg19(pretrained='imagenet')
         self.a_net = a_net
         self.v_net = v_net
         self.classifier = classifier

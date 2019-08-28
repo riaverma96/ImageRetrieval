@@ -12,6 +12,11 @@ def instance_bce_with_logits(logits, labels):
 
     loss = nn.functional.binary_cross_entropy_with_logits(logits, labels)
     loss *= labels.size(1)
+
+    # distance_positive = (anchor - positive).pow(2).sum(1)  # .pow(.5)
+    # distance_negative = (anchor - negative).pow(2).sum(1)  # .pow(.5)
+    # loss = F.relu(distance_positive - distance_negative + margin)
+    # loss = loss.mean() if size_average else losses.sum()
     return loss
 
 # TODO: change since multiple attributes can be the correct answer.
@@ -25,7 +30,7 @@ def compute_score_with_logits(logits, labels):
 
 def train(model, train_loader, eval_loader, num_epochs, output):
     utils.create_dir(output)
-    optim = torch.optim.SGD(model.parameters())
+    optim = torch.optim.SGD(model.parameters(), lr=0.001)
     logger = utils.Logger(os.path.join(output, 'log.txt'))
     best_eval_score = 0
 
@@ -33,12 +38,13 @@ def train(model, train_loader, eval_loader, num_epochs, output):
         total_loss = 0
         train_score = 0
         t = time.time()
+        print("epoch = ", epoch)
 
-        for i, (id, category, feature, attribute) in enumerate(train_loader):
-            id = Variable(id).cuda()
+        for i, (category, feature, attribute, target) in enumerate(train_loader):
             category = Variable(category).cuda()
             feature = Variable(feature).cuda()
             attribute = Variable(attribute).cuda()
+            targets = Variable(target).cuda()
 
             pred = model(feature, attribute)
             loss = instance_bce_with_logits(pred, attribute)
