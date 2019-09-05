@@ -2,6 +2,7 @@ import os
 import time
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import utils
 from torch.autograd import Variable
 
@@ -13,10 +14,14 @@ def instance_bce_with_logits(logits, labels):
     loss = nn.functional.binary_cross_entropy_with_logits(logits, labels)
     loss *= labels.size(1)
 
-    # distance_positive = (anchor - positive).pow(2).sum(1)  # .pow(.5)
-    # distance_negative = (anchor - negative).pow(2).sum(1)  # .pow(.5)
-    # loss = F.relu(distance_positive - distance_negative + margin)
-    # loss = loss.mean() if size_average else losses.sum()
+    # anchor --> top
+    # positive --> another item from same id or similar attributes
+    # negative --> same class but different id or dissimilar attributes
+
+    distance_positive = (anchor - positive).pow(2).sum(1)  # .pow(.5)
+    distance_negative = (anchor - negative).pow(2).sum(1)  # .pow(.5)
+    loss = F.relu(distance_positive - distance_negative + margin)
+    loss = loss.mean() if size_average else losses.sum()
     return loss
 
 # TODO: change since multiple attributes can be the correct answer.

@@ -43,7 +43,7 @@ if __name__ == '__main__':
     train_dset = ImageRetrievalDataset('train', model_conv)
     eval_dset = ImageRetrievalDataset('val', model_conv)  # TODO: need to differentiate bw train and val set
     constructor = 'build_baseline'
-    model = getattr(base_model, constructor)(train_dset, args.num_hid).cuda()
+    model = getattr(base_model, constructor)(train_dset, args.num_hid)  #.cuda()
     model = nn.DataParallel(model).cuda()
 
     train_loader = DataLoader(train_dset, args.batch_size, shuffle=True, num_workers=1)
