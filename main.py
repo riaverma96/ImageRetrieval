@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 from torch.autograd import Variable
 from dataset import ImageRetrievalDataset
 from train import train
-import base_model
+import model
 import torchvision
 
 def parse_args():
@@ -22,7 +22,7 @@ def parse_args():
     parser.add_argument('--image_filenames', type=str, default='./data/img/Sheer_Pleated-Front_Blouse/img_00000001.jpg', help='filepath to raw images.')
     parser.add_argument('--attribute_filename', type=str, default='./data/info.csv', help='filepath to attributes.')
     parser.add_argument('--output', type=str, default='saved_models/exp0')
-    parser.add_argument('--batch_size', type=int, default=4)  # 512
+    parser.add_argument('--batch_size', type=int, default=1)  # 512
     parser.add_argument('--seed', type=int, default=1111, help='random seed')
     args = parser.parse_args()
     return args
@@ -41,9 +41,9 @@ if __name__ == '__main__':
     model_conv.classifier = nn.Sequential(*features)
 
     train_dset = ImageRetrievalDataset('train', model_conv)
-    eval_dset = ImageRetrievalDataset('val', model_conv)  # TODO: need to differentiate bw train and val set
+    eval_dset = ImageRetrievalDataset('val', model_conv)
     constructor = 'build_baseline'
-    model = getattr(base_model, constructor)(train_dset, args.num_hid)  #.cuda()
+    model = getattr(model, constructor)(train_dset, args.num_hid)  #.cuda()
     model = nn.DataParallel(model).cuda()
 
     train_loader = DataLoader(train_dset, args.batch_size, shuffle=True, num_workers=1)

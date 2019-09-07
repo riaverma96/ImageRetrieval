@@ -5,10 +5,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 import utils
 from torch.autograd import Variable
+import pdb
 
 
 # TODO: Change loss to triplet loss
-def instance_bce_with_logits(logits, labels):
+def triplet_loss(logits, labels):
     assert logits.dim() == 2
 
     loss = nn.functional.binary_cross_entropy_with_logits(logits, labels)
@@ -24,13 +25,11 @@ def instance_bce_with_logits(logits, labels):
     loss = loss.mean() if size_average else losses.sum()
     return loss
 
-# TODO: change since multiple attributes can be the correct answer.
-def compute_score_with_logits(logits, labels):
-    logits = torch.max(logits, 1)[1].data # argmax
-    one_hots = torch.zeros(*labels.size()).cuda()
-    one_hots.scatter_(1, logits.view(-1, 1), 1)
-    scores = (one_hots * labels)
-    return scores
+
+def compute_score_with_logits(predicted, target):
+    # predicted.data
+    # TODO double check that summed across first dimension.
+    return sum(predicted * target)
 
 
 def train(model, train_loader, eval_loader, num_epochs, output):
@@ -45,14 +44,15 @@ def train(model, train_loader, eval_loader, num_epochs, output):
         t = time.time()
         print("epoch = ", epoch)
 
-        for i, (category, feature, attribute, target) in enumerate(train_loader):
-            category = Variable(category).cuda()
+        for i, (category, feature, target_attributes) in enumerate(train_loader):
+            print("    i = ", i)
             feature = Variable(feature).cuda()
-            attribute = Variable(attribute).cuda()
-            targets = Variable(target).cuda()
+            target_attributes = Variable(target_attributes).cuda()
 
-            pred = model(feature, attribute)
-            loss = instance_bce_with_logits(pred, attribute)
+            print(".")
+            pred = model(feature, target_attributes)
+            print("..")
+            loss = triplet_loss(pred, target_attributes)
             loss.backward()
             nn.utils.clip_grad_norm(model.parameters(), 0.25)
             optim.step()
@@ -81,10 +81,10 @@ def evaluate(model, dataloader):
     score = 0
     upper_bound = 0
     num_data = 0
-    for _, _, feature, attribute in iter(dataloader):
+    for _, feature, target_attributes in iter(dataloader):
         feature = Variable(feature, volatile=True).cuda()
         pred = model(feature, None)
-        batch_score = compute_score_with_logits(pred, attribute.cuda()).sum()
+        batch_score = compute_score_with_logits(pred, target_attributes.cuda()).sum()
         score += batch_score
         upper_bound += (a.max(1)[0]).sum()  # TODO: change since multiple attributes can be the correct answer.
         num_data += pred.size(0)
