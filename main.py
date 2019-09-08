@@ -49,4 +49,5 @@ if __name__ == '__main__':
     train_loader = DataLoader(train_dset, args.batch_size, shuffle=True, num_workers=1)
     eval_loader =  DataLoader(eval_dset, args.batch_size, shuffle=True, num_workers=1)
     print("training ...")
-    train(model, train_loader, eval_loader, args.epochs, args.output)
+    train(model, train_loader, eval_loader, args.epochs, args.output,  \
+        train_dset.enumerated_ids, train_dset.attributes, eval_dset.enumerated_ids, eval_dset.attributes)

@@ -45,23 +45,21 @@ def get_image_feature(model_conv, img_filepath):
     return img_feature
 
 
-def _load_attributes(name, data_splits, img_ids_keep):
+def _load_attributes(name, img_ids_keep):
     id_attributes = {}
-    img_ids = []
-    # let's only train on 8 images
     img_cnt = 0
+    img_ids_keep = [x[0] for x in img_ids_keep]
     with open(base_path + 'Anno/list_attr_items.txt') as f:
         next(f)  # skip the header
         next(f)
         for line in f:
             img_id = int(line.split(' ')[0].split('_')[1])
-            if data_splits[img_id] == name and str(img_id) in img_ids_keep:
+            if img_id in img_ids_keep:
                 attributes = line.split('\n')[0].split(' ')[1:]
                 attributes = [float(x) for x in attributes]
                 id_attributes[img_id] = attributes
-                img_ids.append(img_id)
                 img_cnt += 1
-    return img_ids, id_attributes
+    return id_attributes
 
 
 def _load_and_extract_image_features(model_conv, name, data_splits, image_feature_file):
@@ -78,17 +76,17 @@ def _load_and_extract_image_features(model_conv, name, data_splits, image_featur
                 # img_type = file.split('_')[2].split('.')[0]
                 # if img_type == 'front':
                 img_id = int(subdir.split('/')[-1].split('_')[1])
-                if data_splits[img_id] == name:
+                outfit_id = int(file.split('_')[0])
+                # {1:front, 2:side, 3:back, 4:full, 6:flat, 7:addtional}
+                shot_type = file.split('_')[2].split('.')[0]
+                if data_splits[(img_id, outfit_id, shot_type)] == name:
                     feat = get_image_feature(model_conv, os.path.join(subdir, file))
                     img_features[cnt, :] = np.array(feat.data)
-                    img_ids[img_id] = cnt
+                    img_ids[(img_id, outfit_id, shot_type)] = cnt
                     cnt += 1
-                else:
-                    print("incorrect name = ", data_splits[img_id])
     h_file.close()
-    img_ids_file = base_path + 'features_img_id_' + name + '.pkl'
-    print(img_ids)
-    json.dump(img_ids, open(img_ids_file, 'w'))
+    img_ids_file = base_path + 'features_img_ids_' + name + '.pkl'
+    cPickle.dump(img_ids, open(img_ids_file, 'w'))
     return img_ids
 
 
@@ -102,8 +100,14 @@ def _process_train_val_splits():
                 split = 'train'
             elif line.find('gallery') != -1:
                 split = 'val'
-            img_id = int(line.split(' ')[0].split('/')[-2].split('_')[1])
-            splits[img_id] = split
+            else:
+                split = 'test'
+            img_info = line.split(' ')[0].split('/')
+            img_id = int(img_info[-2].split('_')[1])
+            outfit_id = int(img_info[-1].split('_')[0])
+            # {1:front, 2:side, 3:back, 4:full, 6:flat, 7:addtional}
+            shot_type = img_info[-1].split('_')[2].split('.')[0]
+            splits[(img_id, outfit_id, shot_type)] = split
     return splits
 
 
@@ -115,12 +119,13 @@ class ImageRetrievalDataset(Dataset):
         self.data_splits = _process_train_val_splits()
         image_feature_file = train_image_feature_file if name == 'train' else val_image_feature_file
 
-        img_ids_file = base_path + 'features_img_id_' + name + '.pkl'
+        img_ids_file = base_path + 'features_img_ids_' + name + '.pkl'
         if not path.exists(image_feature_file) or not path.exists(img_ids_file):
             self.feature_img_ids = _load_and_extract_image_features(model_conv, name, self.data_splits, image_feature_file)
         else:
-            self.feature_img_ids = json.load(open(img_ids_file, 'r'))
-        self.attribute_img_ids, self.attributes = _load_attributes(name, self.data_splits, list(self.feature_img_ids.keys()))
+            self.feature_img_ids = cPickle.load(open(img_ids_file, 'r'))
+        self.enumerated_ids = list(self.feature_img_ids.keys())
+        self.attributes = _load_attributes(name, self.enumerated_ids)
 
         with h5py.File(image_feature_file, 'r') as hf:
             self.img_features = torch.from_numpy(np.array(hf.get('image_features')))
@@ -129,10 +134,10 @@ class ImageRetrievalDataset(Dataset):
         self.v_dim = 4096  # switch from hard-coded. img_feature is [1x4096] dim.
 
     def __getitem__(self, index):
-        img_id = self.attribute_img_ids[index]
-        target_attributes = self.attributes[img_id]
-        feature_id = self.feature_img_ids[str(img_id)]
+        img_id, outfit_id, shot_type = self.enumerated_ids[index]
+        feature_id = self.feature_img_ids[(img_id, outfit_id, shot_type)]
         img_features = self.img_features[feature_id]
+        target_attributes = self.attributes[img_id]
 
         # tensorize
         target_attributes = torch.from_numpy(np.array(target_attributes, dtype='f'))
@@ -141,8 +146,7 @@ class ImageRetrievalDataset(Dataset):
         # target = torch.zeros(self.num_ans_candidates)
         # if labels is not None:
         #     target.scatter_(0, labels, scores)
-        category = []  # torch.tensor(category)
-        return category, img_features, target_attributes
+        return img_features, target_attributes, img_id, outfit_id, shot_type
 
     def __len__(self):
         return len(self.feature_img_ids)

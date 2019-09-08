@@ -5,24 +5,49 @@ import torch.nn as nn
 import torch.nn.functional as F
 import utils
 from torch.autograd import Variable
+from random import sample
+import numpy
 import pdb
 
 
-# TODO: Change loss to triplet loss
-def triplet_loss(logits, labels):
+# TODO: Differentiate based on outfit id as well? (As opposed to just img id).
+def triplet_loss(logits, labels, img_id, enumerated_ids, attr):
     assert logits.dim() == 2
 
-    loss = nn.functional.binary_cross_entropy_with_logits(logits, labels)
-    loss *= labels.size(1)
+    # Loss for task
+    loss_for_task = nn.functional.binary_cross_entropy_with_logits(logits, labels)
+    loss_for_task *= labels.size(1)
 
-    # anchor --> top
-    # positive --> another item from same id or similar attributes
-    # negative --> same class but different id or dissimilar attributes
+    # Triplet loss
+    # randomly sample positive and negative
+    print(".")
+    pos_instance, neg_instance = None, None
+    while True:
+        sampled_instance = sample(enumerated_ids, 1)[0]
+        sampled_img_id = sampled_instance[0]
+        if sampled_img_id != img_id.cpu().numpy()[0]:
+            neg_instance = sampled_instance
+            print("neg instance = ", neg_instance)
+            break
 
+    for instance in enumerated_ids:
+        candidate_img_id = instance[0]
+        if candidate_img_id == img_id.cpu().numpy()[0]:
+            pos_instance = instance
+            print("pos instance = ", pos_instance)
+            break
+
+    anchor = numpy.asarray(logits.data.tolist()[0])
+    positive = numpy.asarray(attr[pos_instance[0]])
+    negative = numpy.asarray(attr[neg_instance[0]])
+
+    # TODO: Try some other notions of distance, like dot products.
     distance_positive = (anchor - positive).pow(2).sum(1)  # .pow(.5)
     distance_negative = (anchor - negative).pow(2).sum(1)  # .pow(.5)
     loss = F.relu(distance_positive - distance_negative + margin)
     loss = loss.mean() if size_average else losses.sum()
+
+    # loss += loss_for_task
     return loss
 
 
@@ -32,7 +57,7 @@ def compute_score_with_logits(predicted, target):
     return sum(predicted * target)
 
 
-def train(model, train_loader, eval_loader, num_epochs, output):
+def train(model, train_loader, eval_loader, num_epochs, output, train_enumerated_ids, train_attr, eval_enumerated_ids, eval_attr):
     utils.create_dir(output)
     optim = torch.optim.SGD(model.parameters(), lr=0.001)
     logger = utils.Logger(os.path.join(output, 'log.txt'))
@@ -44,15 +69,14 @@ def train(model, train_loader, eval_loader, num_epochs, output):
         t = time.time()
         print("epoch = ", epoch)
 
-        for i, (category, feature, target_attributes) in enumerate(train_loader):
+        for i, (feature, target_attributes, img_id, outfit_id, shot_type) in enumerate(train_loader):
             print("    i = ", i)
             feature = Variable(feature).cuda()
             target_attributes = Variable(target_attributes).cuda()
 
-            print(".")
             pred = model(feature, target_attributes)
-            print("..")
-            loss = triplet_loss(pred, target_attributes)
+            loss = triplet_loss(pred, target_attributes, img_id, train_enumerated_ids, train_attr)
+            print("triplet loss = ", loss)
             loss.backward()
             nn.utils.clip_grad_norm(model.parameters(), 0.25)
             optim.step()
@@ -65,7 +89,7 @@ def train(model, train_loader, eval_loader, num_epochs, output):
         total_loss /= len(train_loader.dataset)
         train_score = 100 * train_score / len(train_loader.dataset)
         model.train(False)
-        eval_score, bound = evaluate(model, eval_loader)
+        eval_score, bound = evaluate(model, eval_loader, eval_enumerated_ids, eval_attr)
         model.train(True)
 
         logger.write('epoch %d, time: %.2f' % (epoch, time.time()-t))
@@ -77,11 +101,11 @@ def train(model, train_loader, eval_loader, num_epochs, output):
             torch.save(model.state_dict(), model_path)
             best_eval_score = eval_score
 
-def evaluate(model, dataloader):
+def evaluate(model, dataloader, eval_enumerated_ids, eval_attr):
     score = 0
     upper_bound = 0
     num_data = 0
-    for _, feature, target_attributes in iter(dataloader):
+    for feature, target_attributes, img_id, outfit_id, shot_type in iter(dataloader):
         feature = Variable(feature, volatile=True).cuda()
         pred = model(feature, None)
         batch_score = compute_score_with_logits(pred, target_attributes.cuda()).sum()
