@@ -22,7 +22,7 @@ def parse_args():
     parser.add_argument('--image_filenames', type=str, default='./data/img/Sheer_Pleated-Front_Blouse/img_00000001.jpg', help='filepath to raw images.')
     parser.add_argument('--attribute_filename', type=str, default='./data/info.csv', help='filepath to attributes.')
     parser.add_argument('--output', type=str, default='saved_models/exp0')
-    parser.add_argument('--batch_size', type=int, default=1)  # 512
+    parser.add_argument('--batch_size', type=int, default=512)
     parser.add_argument('--seed', type=int, default=1111, help='random seed')
     args = parser.parse_args()
     return args

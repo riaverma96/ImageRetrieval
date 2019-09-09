@@ -14,47 +14,46 @@ import pdb
 def triplet_loss(logits, labels, img_id, enumerated_ids, attr):
     assert logits.dim() == 2
 
-    # Loss for task
-    loss_for_task = nn.functional.binary_cross_entropy_with_logits(logits, labels)
-    loss_for_task *= labels.size(1)
-
     # Triplet loss
-    # randomly sample positive and negative
-    print(".")
-    pos_instance, neg_instance = None, None
-    while True:
-        sampled_instance = sample(enumerated_ids, 1)[0]
-        sampled_img_id = sampled_instance[0]
-        if sampled_img_id != img_id.cpu().numpy()[0]:
-            neg_instance = sampled_instance
-            print("neg instance = ", neg_instance)
-            break
+    losses = 0
+    for i in range(logits.size(0)):
+        pos_instance, neg_instance = None, None
+        while True:  # negative sample
+            sampled_instance = sample(enumerated_ids, 1)[0]
+            sampled_img_id = sampled_instance[0]
+            if sampled_img_id != img_id[i]:
+                neg_instance = sampled_instance
+                break
 
-    for instance in enumerated_ids:
-        candidate_img_id = instance[0]
-        if candidate_img_id == img_id.cpu().numpy()[0]:
-            pos_instance = instance
-            print("pos instance = ", pos_instance)
-            break
+        for instance in enumerated_ids:  # positive sample
+            candidate_img_id = instance[0]
+            if candidate_img_id == img_id[i]:
+                pos_instance = instance
+                break
 
-    anchor = numpy.asarray(logits.data.tolist()[0])
-    positive = numpy.asarray(attr[pos_instance[0]])
-    negative = numpy.asarray(attr[neg_instance[0]])
+        anchor = numpy.asarray(logits.data.tolist()[i])
+        positive = numpy.asarray(attr[pos_instance[i]])
+        negative = numpy.asarray(attr[neg_instance[i]])
 
-    # TODO: Try some other notions of distance, like dot products.
-    distance_positive = (anchor - positive).pow(2).sum(1)  # .pow(.5)
-    distance_negative = (anchor - negative).pow(2).sum(1)  # .pow(.5)
-    loss = F.relu(distance_positive - distance_negative + margin)
-    loss = loss.mean() if size_average else losses.sum()
+        distance_positive = numpy.dot(anchor, positive)
+        distance_negative = numpy.dot(anchor, negative)
 
-    # loss += loss_for_task
-    return loss
+        pdb.set_trace()
+        margin = Variable(torch.tensor(0.1)).cuda()
+        losses += F.relu(distance_positive - distance_negative + margin)
+    losses = losses.mean() if size_average else losses.sum()
+
+    # losses += loss_for_task
+    return losses
 
 
 def compute_score_with_logits(predicted, target):
     # predicted.data
-    # TODO double check that summed across first dimension.
-    return sum(predicted * target)
+    # Loss for task
+    loss_for_task = nn.functional.binary_cross_entropy_with_logits(logits, labels)
+    loss_for_task *= labels.size(1)
+    loss = loss.mean() if size_average else loss.sum()
+    return loss
 
 
 def train(model, train_loader, eval_loader, num_epochs, output, train_enumerated_ids, train_attr, eval_enumerated_ids, eval_attr):
