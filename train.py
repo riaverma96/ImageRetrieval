@@ -14,6 +14,10 @@ import pdb
 def triplet_loss(logits, labels, img_id, enumerated_ids, attr):
     assert logits.dim() == 2
 
+    # Loss for task
+    # loss_for_task = nn.functional.binary_cross_entropy_with_logits(logits, labels)
+    # loss_for_task *= labels.size(1)
+
     # Triplet loss
     losses = 0
     for i in range(logits.size(0)):
@@ -41,7 +45,7 @@ def triplet_loss(logits, labels, img_id, enumerated_ids, attr):
         pdb.set_trace()
         margin = Variable(torch.tensor(0.1)).cuda()
         losses += F.relu(distance_positive - distance_negative + margin)
-    losses = losses.mean() if size_average else losses.sum()
+    losses = loss.mean() if size_average else losses.sum()
 
     # losses += loss_for_task
     return losses
@@ -49,11 +53,8 @@ def triplet_loss(logits, labels, img_id, enumerated_ids, attr):
 
 def compute_score_with_logits(predicted, target):
     # predicted.data
-    # Loss for task
-    loss_for_task = nn.functional.binary_cross_entropy_with_logits(logits, labels)
-    loss_for_task *= labels.size(1)
-    loss = loss.mean() if size_average else loss.sum()
-    return loss
+    # TODO double check that summed across first dimension.
+    return sum(predicted * target)
 
 
 def train(model, train_loader, eval_loader, num_epochs, output, train_enumerated_ids, train_attr, eval_enumerated_ids, eval_attr):

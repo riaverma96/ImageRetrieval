@@ -2,7 +2,7 @@ from __future__ import print_function
 import os
 import re
 import json
-import cPickle
+import pickle
 import numpy as np
 import h5py
 import torch
@@ -86,7 +86,7 @@ def _load_and_extract_image_features(model_conv, name, data_splits, image_featur
                     cnt += 1
     h_file.close()
     img_ids_file = base_path + 'features_img_ids_' + name + '.pkl'
-    cPickle.dump(img_ids, open(img_ids_file, 'w'))
+    pickle.dump(img_ids, open(img_ids_file, 'wb'))
     return img_ids
 
 
@@ -123,7 +123,7 @@ class ImageRetrievalDataset(Dataset):
         if not path.exists(image_feature_file) or not path.exists(img_ids_file):
             self.feature_img_ids = _load_and_extract_image_features(model_conv, name, self.data_splits, image_feature_file)
         else:
-            self.feature_img_ids = cPickle.load(open(img_ids_file, 'r'))
+            self.feature_img_ids = pickle.load(open(img_ids_file, 'rb'))
         self.enumerated_ids = list(self.feature_img_ids.keys())
         self.attributes = _load_attributes(name, self.enumerated_ids)
 
