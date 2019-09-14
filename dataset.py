@@ -2,7 +2,7 @@ from __future__ import print_function
 import os
 import re
 import json
-import pickle
+import cPickle as pickle  # import pickle
 import numpy as np
 import h5py
 import torch
@@ -86,7 +86,7 @@ def _load_and_extract_image_features(model_conv, name, data_splits, image_featur
                     cnt += 1
     h_file.close()
     img_ids_file = base_path + 'features_img_ids_' + name + '.pkl'
-    pickle.dump(img_ids, open(img_ids_file, 'wb'))
+    pickle.dump(img_ids, open(img_ids_file, 'wb'), protocol=2) #)
     return img_ids
 
 

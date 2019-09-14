@@ -14,10 +14,6 @@ import pdb
 def triplet_loss(logits, labels, img_id, enumerated_ids, attr):
     assert logits.dim() == 2
 
-    # Loss for task
-    # loss_for_task = nn.functional.binary_cross_entropy_with_logits(logits, labels)
-    # loss_for_task *= labels.size(1)
-
     # Triplet loss
     losses = 0
     for i in range(logits.size(0)):
@@ -35,19 +31,19 @@ def triplet_loss(logits, labels, img_id, enumerated_ids, attr):
                 pos_instance = instance
                 break
 
-        anchor = numpy.asarray(logits.data.tolist()[i])
-        positive = numpy.asarray(attr[pos_instance[i]])
-        negative = numpy.asarray(attr[neg_instance[i]])
+        pdb.set_trace()
+        anchor = logits[i]
+        positive = attr[pos_instance[i]]
+        negative = attr[neg_instance[i]]
 
-        distance_positive = numpy.dot(anchor, positive)
-        distance_negative = numpy.dot(anchor, negative)
+        distance_positive = torch.dot(anchor, positive)
+        distance_negative = torch.dot(anchor, negative)
 
         pdb.set_trace()
         margin = Variable(torch.tensor(0.1)).cuda()
         losses += F.relu(distance_positive - distance_negative + margin)
     losses = loss.mean() if size_average else losses.sum()
 
-    # losses += loss_for_task
     return losses
 
 
