@@ -12,7 +12,6 @@ class FCNet(nn.Module):
     """
     def __init__(self, dims):
         super(FCNet, self).__init__()
-
         layers = []
         for i in range(len(dims)-2):
             in_dim = dims[i]
@@ -82,24 +81,24 @@ class BaseModel(nn.Module):
 
         return: logits, not probs
         """
-        # TODO: Do we need k feature representations per image? (UpDn has 1 per object).
+        # TODO: Do we need k feature representations per image?
+
+        att_repr = self.q_net(attributes)  # [batch, num_hid]
 
         # attended image
-        att = self.v_att(image_features, attributes)
-        # print("att.shape = ", att.shape, "; (att * image_features) = ", (att * image_features))
+        att = self.v_att(image_features, att_repr)
         v_emb = (att * image_features)  # [batch, v_dim]  Note: removed .sum(1) bc 1 feature per image
         v_repr = self.v_net(v_emb)  # [batch, num_hid]
 
-        # attribute
-        q_repr = self.q_net(attributes)  # [batch, num_hid]
-
-        joint_repr = q_repr * v_repr  # [batch, num_hid]
+        joint_repr = att_repr * v_repr  # [batch, num_hid]
         logits = self.classifier(joint_repr)  # [batch, classes]
         return logits
 
 
 def build_baseline(dataset, num_hid):
-    v_att = Attention(dataset.v_dim, dataset.num_ans_candidates, num_hid)
+    # previously, Attention(dataset.v_dim, dataset.num_ans_candidates, 4)
+    # used attribute embedding instead of using the attributes directly
+    v_att = Attention(dataset.v_dim, num_hid, 4)
     q_net = FCNet([dataset.num_ans_candidates, num_hid])
     v_net = FCNet([dataset.v_dim, num_hid])
     classifier = SimpleClassifier(

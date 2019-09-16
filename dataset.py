@@ -2,7 +2,8 @@ from __future__ import print_function
 import os
 import re
 import json
-import cPickle as pickle  # import pickle
+# import cPickle as pickle  #
+import pickle
 import numpy as np
 import h5py
 import torch
@@ -146,7 +147,13 @@ class ImageRetrievalDataset(Dataset):
         # target = torch.zeros(self.num_ans_candidates)
         # if labels is not None:
         #     target.scatter_(0, labels, scores)
-        return img_features, target_attributes, img_id, outfit_id, shot_type
+        data = {}
+        data['feature'] = img_features
+        data['target_attributes'] = target_attributes
+        data['img_id'] = img_id
+        data['outfit_id'] = outfit_id
+        data['shot_type'] = shot_type
+        return data
 
     def __len__(self):
         return len(self.feature_img_ids)

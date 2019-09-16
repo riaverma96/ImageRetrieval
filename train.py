@@ -31,19 +31,17 @@ def triplet_loss(logits, labels, img_id, enumerated_ids, attr):
                 pos_instance = instance
                 break
 
-        pdb.set_trace()
         anchor = logits[i]
-        positive = attr[pos_instance[i]]
-        negative = attr[neg_instance[i]]
+        positive = torch.tensor(attr[pos_instance[0]]).cuda()  # (1964, 2, 'front')
+        negative = torch.tensor(attr[neg_instance[0]]).cuda()
 
         distance_positive = torch.dot(anchor, positive)
         distance_negative = torch.dot(anchor, negative)
 
-        pdb.set_trace()
         margin = Variable(torch.tensor(0.1)).cuda()
         losses += F.relu(distance_positive - distance_negative + margin)
-    losses = loss.mean() if size_average else losses.sum()
 
+    losses = losses.mean() # or losses.sum()
     return losses
 
 
@@ -65,32 +63,38 @@ def train(model, train_loader, eval_loader, num_epochs, output, train_enumerated
         t = time.time()
         print("epoch = ", epoch)
 
-        for i, (feature, target_attributes, img_id, outfit_id, shot_type) in enumerate(train_loader):
-            print("    i = ", i)
+        for i, data in enumerate(train_loader):
+            feature = data['feature']
+            target_attributes = data['target_attributes']
+            img_id = data['img_id']
+            outfit_id = data['outfit_id']
+            shot_type = data['shot_type']
+
             feature = Variable(feature).cuda()
             target_attributes = Variable(target_attributes).cuda()
 
-            pred = model(feature, target_attributes)
+            pred = model(feature, target_attributes)  # (512, 463)
             loss = triplet_loss(pred, target_attributes, img_id, train_enumerated_ids, train_attr)
-            print("triplet loss = ", loss)
             loss.backward()
             nn.utils.clip_grad_norm(model.parameters(), 0.25)
             optim.step()
             optim.zero_grad()
 
-            batch_score = compute_score_with_logits(pred, a.data).sum()
-            total_loss += loss.data[0] * v.size(0)
-            train_score += batch_score
+            # batch_score = compute_score_with_logits(pred, target.data).sum()
+            v_dim = 4096  # switch from hard-coded. img_feature is [1x4096] dim.
+            total_loss += loss.data[0] * v_dim  # v.size(0)
+            # train_score += batch_score
 
         total_loss /= len(train_loader.dataset)
-        train_score = 100 * train_score / len(train_loader.dataset)
+        # train_score = 100 * train_score / len(train_loader.dataset)
+        train_score = 0
         model.train(False)
         eval_score, bound = evaluate(model, eval_loader, eval_enumerated_ids, eval_attr)
         model.train(True)
 
         logger.write('epoch %d, time: %.2f' % (epoch, time.time()-t))
         logger.write('\ttrain_loss: %.2f, score: %.2f' % (total_loss, train_score))
-        logger.write('\teval score: %.2f (%.2f)' % (100 * eval_score, 100 * bound))
+        # logger.write('\teval score: %.2f (%.2f)' % (100 * eval_score, 100 * bound))
 
         if eval_score > best_eval_score:
             model_path = os.path.join(output, 'model.pth')
@@ -100,6 +104,9 @@ def train(model, train_loader, eval_loader, num_epochs, output, train_enumerated
 def evaluate(model, dataloader, eval_enumerated_ids, eval_attr):
     score = 0
     upper_bound = 0
+    return score, upper_bound
+
+    # TODO: fix evaluate
     num_data = 0
     for feature, target_attributes, img_id, outfit_id, shot_type in iter(dataloader):
         feature = Variable(feature, volatile=True).cuda()
