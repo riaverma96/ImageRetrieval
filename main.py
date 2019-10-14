@@ -17,7 +17,7 @@ import torchvision
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--epochs', type=int, default=30)
-    parser.add_argument('--num_hid', type=int, default=1024)
+    parser.add_argument('--num_hid', type=int, default=4096)  #
     parser.add_argument('--image_filenames', type=str, default='./data/img/Sheer_Pleated-Front_Blouse/img_00000001.jpg', help='filepath to raw images.')
     parser.add_argument('--attribute_filename', type=str, default='./data/info.csv', help='filepath to attributes.')
     parser.add_argument('--output', type=str, default='saved_models/exp0')
@@ -42,7 +42,7 @@ if __name__ == '__main__':
     train_dset = ImageRetrievalDataset('train', model_conv)
     eval_dset = ImageRetrievalDataset('val', model_conv)
     constructor = 'build_baseline'
-    model = getattr(model, constructor)(train_dset, args.num_hid)  #.cuda()
+    model = getattr(model, constructor)(train_dset, args.num_hid).cuda()
     model = nn.DataParallel(model).cuda()
 
     train_loader = DataLoader(train_dset, args.batch_size, shuffle=True, num_workers=1)

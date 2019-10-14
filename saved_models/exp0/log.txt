@@ -1,0 +1,2 @@
+epoch 0, time: 34.61
+	train_loss: 446.42, score: 0.00
